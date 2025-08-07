@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  sse-app:
+    build:
+      context: .                         # Build context is the root of the repo
+      dockerfile: sse-demo-app/Dockerfile  # Explicit Dockerfile path
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
