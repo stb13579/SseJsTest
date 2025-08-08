@@ -6,7 +6,6 @@ import {
   global,
   scenario,
   jmesPath,
-  substring,
   forever,
   pace
 } from "@gatling.io/core";
@@ -26,7 +25,7 @@ export default simulation((setUp) => {
       sse("Connect to /prices")
         .get("/prices")
         .await(10)
-        .on(sse.checkMessage("snapshot").matching(substring('"event":"snapshot"')))
+        .on(sse.checkMessage("snapshot").matching(jmesPath("event").is("snapshot")))
     )
     .exec(
       // consume initial batch of price updates after the snapshot
@@ -39,7 +38,7 @@ export default simulation((setUp) => {
             sse("Await price update")
               .setCheck()
               .await(10)
-              .on(sse.checkMessage("price-update").matching(substring('"event":"price-update"')))
+              .on(sse.checkMessage("price-update").matching(jmesPath("event").is("price-update")))
           )
           .exec(
             // drain any extra price updates between checks
