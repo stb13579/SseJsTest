@@ -5,12 +5,8 @@ import {
   getParameter,
   global,
   scenario,
-  forever,
-  pace,
   pause,
-  asLongAs,
-  repeat,
-  regex,
+  jsonPath,
 } from "@gatling.io/core";
 import { http, sse } from "@gatling.io/http";
 
@@ -18,6 +14,7 @@ export default simulation((setUp) => {
   const baseUrl = getParameter("baseUrl", "http://localhost:3000");
   const users = parseInt(getParameter("vu", "10"));
   const duration = parseInt(getParameter("duration", "30")); // seconds
+  const pattern = getParameter("pattern", "allAtOnce");
 
   const httpProtocol = http
     .baseUrl(baseUrl);
@@ -29,45 +26,35 @@ export default simulation((setUp) => {
         .get("/prices")
         .await(10)
         .on(
-          sse.checkMessage("first-message")
-            .check(regex("event: snapshot(.*)"))
+          sse
+            .checkMessage("snapshot")
+            .check(jsonPath("$[0].symbol").exists())
         ),
       // Keep the connection open for the duration of the test
-      // This simulates real users keeping SSE connections alive
-      pause(duration - 5), // Keep connection open for most of test duration
+      pause(Math.max(duration, 0)),
       sse("Close SSE connection").close()
     );
 
-  // Alternative simpler approach - just keep connection open without checks
-  const simpleScn = scenario("Simple SSE Feed")
-    .exec(
-      sse("Connect to /prices")
-        .get("/prices")
-    )
-    .pause(20) // Just wait 20 seconds for messages to flow
-    .exec(
-      sse("Close SSE connection")
-        .close()
-    );
+  let injection;
+  switch (pattern) {
+    case "rampUp":
+      injection = scn.injectOpen(constantUsersPerSec(users / 10).during(10));
+      break;
+    case "mixed":
+      injection = scn.injectOpen(
+        atOnceUsers(Math.floor(users / 2)),
+        constantUsersPerSec(Math.max(users / 20, 1)).during(Math.max(duration / 2, 1))
+      );
+      break;
+    default:
+      injection = scn.injectOpen(atOnceUsers(users));
+  }
 
-  // You might also want to test different connection patterns:
-  
-  // Pattern 1: All users connect at once and hold connections
-  const allAtOnce = scn.injectOpen(atOnceUsers(users));
-  
-  // Pattern 2: Gradual ramp-up to simulate realistic user growth
-  const rampUp = scn.injectOpen(constantUsersPerSec(users / 10).during(10));
-  
-  // Pattern 3: Mixed - some connect early, others join later
-  const mixed = scn.injectOpen(
-    atOnceUsers(users / 2),
-    constantUsersPerSec(users / 20).during(duration / 2)
-  );
-
-  setUp(allAtOnce) // Change this to test different patterns
+  setUp(injection)
     .protocols(httpProtocol)
     .assertions(
-      global().failedRequests().count().lt(users) // Allow some failures
+      global().failedRequests().count().lt(users),
+      global().responseTime().max().lt(1000)
     )
-    .maxDuration(duration);
+    .maxDuration(duration + 5);
 });
