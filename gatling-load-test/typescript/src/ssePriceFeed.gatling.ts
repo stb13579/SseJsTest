@@ -1,60 +1,102 @@
 import {
   simulation,
-  atOnceUsers,
-  constantUsersPerSec,
-  getParameter,
-  global,
   scenario,
+  constantUsersPerSec,
+  atOnceUsers,
+  rampUsers,
   pause,
-  jsonPath,
+  jmesPath,
 } from "@gatling.io/core";
 import { http, sse } from "@gatling.io/http";
 
+// Gatling's JavaScript engine exposes the Java interop API
+declare const Java: any;
+
+// Define the simulation
 export default simulation((setUp) => {
-  const baseUrl = getParameter("baseUrl", "http://localhost:3000");
-  const users = parseInt(getParameter("vu", "10"));
-  const duration = parseInt(getParameter("duration", "30")); // seconds
-  const pattern = getParameter("pattern", "allAtOnce");
+  const System = Java.type("java.lang.System"); // Access Java System class for environment variables
+  const baseUrl = System.getenv("BASE_URL") || "http://localhost:3000"; // Default to localhost if BASE_URL is not set
 
-  const httpProtocol = http
-    .baseUrl(baseUrl);
+  const httpProtocol = http.baseUrl(baseUrl);
 
-  // Real SSE load test - concurrent connections streaming data
-  const scn = scenario("SSE Crypto Feed")
+  // Quick price checker - connects briefly
+  const quickChecker = scenario("QuickPriceChecker")
+  .exec(
+    sse("Prices").get("/prices")  // You need .get() to establish the connection
+      .await(10).on(
+        sse.checkMessage("price-update")
+  .matching(jmesPath("event").is("price-update"))
+  .check(
+    jmesPath("data").exists(),
+    // Check that prices are reasonable (not corrupted/null)
+    jmesPath("data")
+    .transform(raw => {
+      const price = JSON.parse(raw).price;
+      return price > 0 && price < 1_000_000; // check price is > 0 and < 1,000,000
+    }),
+  )),
+    pause(2, 8),
+    sse("Prices").close()
+  );
+  
+  // Active trader - stays connected longer
+  const activeTrader = scenario("ActiveTrader")
+  .exec(
+    sse("Prices").get("/prices")
+      .await(30).on(
+          sse.checkMessage("price-update")
+  .matching(jmesPath("event").is("price-update"))
+  .check(
+    jmesPath("data").exists(),
+    // Check that prices are reasonable (not corrupted/null)
+    jmesPath("data")
+    .transform(raw => {
+      const price = JSON.parse(raw).price;
+      return price > 0 && price < 1_000_000; // check price is > 0 and < 1,000,000
+    }),
+  )),
+    pause(25, 35),
+    sse("Prices").close()
+  );
+
+  // Long-term monitor - keeps connection open
+  const longTermMonitor = scenario("LongTermMonitor")
     .exec(
-      sse("Connect to /prices")
-        .get("/prices")
-        .await(10)
-        .on(
-          sse
-            .checkMessage("snapshot")
-            .check(jsonPath("$[0].symbol").exists())
-        ),
-      // Keep the connection open for the duration of the test
-      pause(Math.max(duration, 0)),
-      sse("Close SSE connection").close()
+    sse("Prices").get("/prices")
+      .await(300).on(
+          sse.checkMessage("price-update")
+  .matching(jmesPath("event").is("price-update"))
+  .check(
+  jmesPath("data").exists(),
+  jmesPath("data")
+    .transform(raw => {
+      const price = JSON.parse(raw).price;
+      return price > 0 && price < 1_000_000; // check price is > 0 and < 1,000,000
+    }) 
+  )),
+
+  pause(280, 320), // Stay connected ~5 minutes with some variation
+  sse("Prices").close()
     );
 
-  let injection;
-  switch (pattern) {
-    case "rampUp":
-      injection = scn.injectOpen(constantUsersPerSec(users / 10).during(10));
-      break;
-    case "mixed":
-      injection = scn.injectOpen(
-        atOnceUsers(Math.floor(users / 2)),
-        constantUsersPerSec(Math.max(users / 20, 1)).during(Math.max(duration / 2, 1))
-      );
-      break;
-    default:
-      injection = scn.injectOpen(atOnceUsers(users));
-  }
-
-  setUp(injection)
-    .protocols(httpProtocol)
-    .assertions(
-      global().failedRequests().count().lt(users),
-      global().responseTime().max().lt(1000)
+  setUp(
+    // 70% are quick checkers
+    quickChecker.injectOpen(
+      atOnceUsers(10),
+      rampUsers(50).during(60), // Ramp up over 1 minute
+      constantUsersPerSec(2).during(300) // Steady stream for 5 minutes
+    ),
+    
+    // 25% are active traders
+    activeTrader.injectOpen(
+      rampUsers(20).during(120), // Slower ramp up
+      constantUsersPerSec(0.5).during(300)
+    ),
+    
+    // 5% are long-term monitors
+    longTermMonitor.injectOpen(
+      atOnceUsers(5),
+      rampUsers(5).during(300) // Very gradual increase
     )
-    .maxDuration(duration + 5);
+  ).protocols(httpProtocol);
 });

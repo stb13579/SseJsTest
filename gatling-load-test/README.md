@@ -49,3 +49,7 @@ npm run build # Build project but don't run
 npm run basicSimulation # Run the included basicSimulation simulation
 npm run recorder # Starts the Gatling Recorder
 ```
+
+### Targeting a remote application
+
+Both simulations read the target URL from the `BASE_URL` environment variable. When running the load tests from Gatling Enterprise or any remote machine, set `BASE_URL` to the public address of your locally running app (for example, the URL printed by the ngrok container).

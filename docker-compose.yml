@@ -8,3 +8,11 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    command: http sse-app:3000
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    depends_on:
+      - sse-app
