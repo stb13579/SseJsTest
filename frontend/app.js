@@ -1,4 +1,5 @@
 const tableBody = document.getElementById('price-table-body');
+const statusEl = document.getElementById('status');
 const prices = {};
 
 function updateTable(symbol, price) {
@@ -8,7 +9,7 @@ function updateTable(symbol, price) {
 
   let priceClass = '';
   if (prices[symbol] !== undefined) {
-    priceClass = price > prices[symbol] ? 'price-up' : (price < prices[symbol] ? 'price-down' : '');
+    priceClass = price > prices[symbol] ? 'price-up' : price < prices[symbol] ? 'price-down' : '';
   }
 
   prices[symbol] = price;
@@ -28,10 +29,20 @@ function updateTable(symbol, price) {
   }
 }
 
-function connectToFeed() {
-  const eventSource = new EventSource('/prices');
+function connectWithRetry(delay = 1000) {
+  statusEl.textContent = 'Connecting...';
+  const es = new EventSource('/prices');
 
-  eventSource.onmessage = function (event) {
+  es.addEventListener('snapshot', (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      data.forEach((d) => updateTable(d.symbol, d.price));
+    } catch (e) {
+      console.error('Invalid snapshot data:', event.data);
+    }
+  });
+
+  es.addEventListener('price-update', (event) => {
     try {
       const data = JSON.parse(event.data);
       if (data.symbol && data.price) {
@@ -40,13 +51,18 @@ function connectToFeed() {
     } catch (e) {
       console.error('Invalid event data:', event.data);
     }
+  });
+
+  es.onopen = () => {
+    statusEl.textContent = 'Connected';
+    delay = 1000; // reset backoff
   };
 
-  eventSource.onerror = function (err) {
-    console.error('SSE connection error:', err);
-    eventSource.close();
-    // Optionally try to reconnect after a delay
+  es.onerror = () => {
+    statusEl.textContent = `Disconnected. Reconnecting in ${delay / 1000}s...`;
+    es.close();
+    setTimeout(() => connectWithRetry(Math.min(delay * 2, 30000)), delay);
   };
 }
 
-connectToFeed();
+connectWithRetry();
