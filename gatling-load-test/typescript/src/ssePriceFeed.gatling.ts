@@ -6,7 +6,7 @@ import {
   global,
   scenario,
   pause,
-  jsonPath,
+  jmesPath
 } from "@gatling.io/core";
 import { http, sse } from "@gatling.io/http";
 
@@ -16,24 +16,18 @@ export default simulation((setUp) => {
   const duration = parseInt(getParameter("duration", "30")); // seconds
   const pattern = getParameter("pattern", "allAtOnce");
 
-  const httpProtocol = http
-    .baseUrl(baseUrl);
+  const httpProtocol = http.baseUrl(baseUrl);
 
   // Real SSE load test - concurrent connections streaming data
-  const scn = scenario("SSE Crypto Feed")
-    .exec(
-      sse("Connect to /prices")
-        .get("/prices")
-        .await(10)
-        .on(
-          sse
-            .checkMessage("snapshot")
-            .check(jsonPath("$[0].symbol").exists())
-        ),
-      // Keep the connection open for the duration of the test
-      pause(Math.max(duration, 0)),
-      sse("Close SSE connection").close()
-    );
+  const scn = scenario("SSE Crypto Feed").exec(
+    sse("Connect to /prices")
+      .get("/prices")
+      .await(10)
+      .on(sse.checkMessage("snapshot").check(jmesPath("[0].symbol").exists())),
+    // Keep the connection open for the duration of the test
+    pause(Math.max(duration, 0)),
+    sse("Close SSE connection").close()
+  );
 
   let injection;
   switch (pattern) {
@@ -52,9 +46,6 @@ export default simulation((setUp) => {
 
   setUp(injection)
     .protocols(httpProtocol)
-    .assertions(
-      global().failedRequests().count().lt(users),
-      global().responseTime().max().lt(1000)
-    )
+    .assertions(global().failedRequests().count().lt(users), global().responseTime().max().lt(1000))
     .maxDuration(duration + 5);
 });
