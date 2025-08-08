@@ -23,7 +23,7 @@ export default simulation((setUp) => {
     sse("Connect to /prices")
       .get("/prices")
       .await(10)
-      .on(sse.checkMessage("snapshot").check(jmesPath("[0].symbol").exists())),
+      .on(sse.checkMessage("snapshot").check(jmesPath("symbol").exists())),
     // Keep the connection open for the duration of the test
     pause(Math.max(duration, 0)),
     sse("Close SSE connection").close()
