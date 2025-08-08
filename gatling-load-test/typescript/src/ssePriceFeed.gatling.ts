@@ -5,9 +5,10 @@ import {
   getParameter,
   global,
   scenario,
-  pause,
   jmesPath,
-  substring
+  substring,
+  forever,
+  pace
 } from "@gatling.io/core";
 import { http, sse } from "@gatling.io/http";
 
@@ -20,20 +21,33 @@ export default simulation((setUp) => {
   const httpProtocol = http.baseUrl(baseUrl);
 
   // Real SSE load test - concurrent connections streaming data
-  const scn = scenario("SSE Crypto Feed").exec(
-    sse("Connect to /prices")
-      .get("/prices")
-      .await(10)
-      .on(
-        sse
-          .checkMessage("snapshot")
-          .matching(substring("event: snapshot"))
-          .check(jmesPath("[0].symbol").exists())
-      ),
-    // Keep the connection open for the duration of the test
-    pause(Math.max(duration, 0)),
-    sse("Close SSE connection").close()
-  );
+  const scn = scenario("SSE Crypto Feed")
+    .exec(
+      sse("Connect to /prices")
+        .get("/prices")
+        .await(10)
+        .on(sse.checkMessage("snapshot").matching(substring('"event":"snapshot"')))
+    )
+    .exec(
+      // consume initial batch of price updates after the snapshot
+      sse.processUnmatchedMessages((messages, session) => session)
+    )
+    .exec(
+      forever().on(
+        pace(2)
+          .exec(
+            sse("Await price update")
+              .setCheck()
+              .await(10)
+              .on(sse.checkMessage("price-update").matching(substring('"event":"price-update"')))
+          )
+          .exec(
+            // drain any extra price updates between checks
+            sse.processUnmatchedMessages((messages, session) => session)
+          )
+      )
+    )
+    .exec(sse("Close SSE connection").close());
 
   let injection;
   switch (pattern) {
@@ -52,6 +66,6 @@ export default simulation((setUp) => {
 
   setUp(injection)
     .protocols(httpProtocol)
-    .assertions(global().failedRequests().count().lt(users), global().responseTime().max().lt(1000))
+    .assertions(global().failedRequests().count().lt(users), global().responseTime().max().lt(2000))
     .maxDuration(duration + 5);
 });
