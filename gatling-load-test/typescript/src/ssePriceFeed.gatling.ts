@@ -5,7 +5,8 @@ import {
   atOnceUsers,
   rampUsers,
   pause,
-  jsonPath
+  jsonPath,
+  substring
 } from "@gatling.io/core";
 import { http, sse } from "@gatling.io/http";
 
@@ -21,45 +22,51 @@ export default simulation((setUp) => {
 
   // Quick price checker - connects briefly
   const quickChecker = scenario("QuickPriceChecker")
-    .exec(
-      sse("Prices").get("/prices")
-        .await(5).on(
-          sse.checkMessage("checkPrices").check(
+  .exec(
+    sse("Prices").get("/prices")
+      .await(5).on(
+        sse.checkMessage("checkPrices").check(
           jsonPath("$.data").exists(),
-          jsonPath("$.data").transform(data => data.includes("symbol")),
-          jsonPath("$.data").transform(data => data.includes("price"))
-          )
-        ),
-      pause(2, 8), // Wait 2-8 seconds to "read" prices
-      sse("Prices").close()
-    );
+          jsonPath("$.data").transform(dataStr => {
+            const parsed = JSON.parse(dataStr);
+            return parsed.symbol && parsed.price;
+          })
+        )
+      ),
+    pause(2, 8),
+    sse("Prices").close()
+  );
 
   // Active trader - stays connected longer
   const activeTrader = scenario("ActiveTrader")
-    .exec(
-      sse("Prices").get("/prices")
-        .await(30).on(
-          sse.checkMessage("checkPrices").check(
+  .exec(
+    sse("Prices").get("/prices")
+      .await(5).on(
+        sse.checkMessage("checkPrices").check(
           jsonPath("$.data").exists(),
-          jsonPath("$.data").transform(data => data.includes("symbol")),
-          jsonPath("$.data").transform(data => data.includes("price"))
-          )
-        ),
-      pause(25, 35), // Stay connected 25-35 seconds
-      sse("Prices").close()
-    );
+          jsonPath("$.data").transform(dataStr => {
+            const parsed = JSON.parse(dataStr);
+            return parsed.symbol && parsed.price;
+          })
+        )
+      ),
+    pause(25, 35),
+    sse("Prices").close()
+  );
 
   // Long-term monitor - keeps connection open
   const longTermMonitor = scenario("LongTermMonitor")
     .exec(
-      sse("Prices").get("/prices")
-        .await(300).on( // 5 minutes
-          sse.checkMessage("checkPrices").check(
+    sse("Prices").get("/prices")
+      .await(5).on(
+        sse.checkMessage("checkPrices").check(
           jsonPath("$.data").exists(),
-          jsonPath("$.data").transform(data => data.includes("symbol")),
-          jsonPath("$.data").transform(data => data.includes("price"))
-          )
-        ),
+          jsonPath("$.data").transform(dataStr => {
+            const parsed = JSON.parse(dataStr);
+            return parsed.symbol && parsed.price;
+          })
+        )
+      ),
       pause(280, 320), // Stay connected ~5 minutes with some variation
       sse("Prices").close()
     );
