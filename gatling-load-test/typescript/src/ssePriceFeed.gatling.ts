@@ -9,9 +9,11 @@ import {
 } from "@gatling.io/core";
 import { http, sse } from "@gatling.io/http";
 
+declare const process: { env: { [key: string]: string | undefined } };
+
 // Define the simulation
 export default simulation((setUp) => {
-  const baseUrl = "http://localhost:3000";
+  const baseUrl = process.env.BASE_URL || "http://localhost:3000";
 
   const httpProtocol = http.baseUrl(baseUrl);
 
