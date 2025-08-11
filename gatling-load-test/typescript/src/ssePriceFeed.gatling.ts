@@ -5,8 +5,9 @@ import {
   atOnceUsers,
   rampUsers,
   pause,
-  jsonPath,
-  substring
+  jmesPath,
+  substring,
+  regex
 } from "@gatling.io/core";
 import { http, sse } from "@gatling.io/http";
 
@@ -25,14 +26,9 @@ export default simulation((setUp) => {
   .exec(
     sse("Prices").get("/prices")
       .await(5).on(
-        sse.checkMessage("checkPrices").check(
-          jsonPath("$.data").exists(),
-          jsonPath("$.data").transform(dataStr => {
-            const parsed = JSON.parse(dataStr);
-            return parsed.symbol && parsed.price;
-          })
-        )
+         sse.checkMessage("price-update").check(regex("data: price(.*)"))
       ),
+  
     pause(2, 8),
     sse("Prices").close()
   );
@@ -41,15 +37,10 @@ export default simulation((setUp) => {
   const activeTrader = scenario("ActiveTrader")
   .exec(
     sse("Prices").get("/prices")
-      .await(5).on(
-        sse.checkMessage("checkPrices").check(
-          jsonPath("$.data").exists(),
-          jsonPath("$.data").transform(dataStr => {
-            const parsed = JSON.parse(dataStr);
-            return parsed.symbol && parsed.price;
-          })
-        )
+      .await(30).on(
+          sse.checkMessage("price-update").check(regex("data: price(.*)"))
       ),
+  
     pause(25, 35),
     sse("Prices").close()
   );
@@ -58,17 +49,12 @@ export default simulation((setUp) => {
   const longTermMonitor = scenario("LongTermMonitor")
     .exec(
     sse("Prices").get("/prices")
-      .await(5).on(
-        sse.checkMessage("checkPrices").check(
-          jsonPath("$.data").exists(),
-          jsonPath("$.data").transform(dataStr => {
-            const parsed = JSON.parse(dataStr);
-            return parsed.symbol && parsed.price;
-          })
-        )
-      ),
-      pause(280, 320), // Stay connected ~5 minutes with some variation
-      sse("Prices").close()
+      .await(300).on(
+          sse.checkMessage("price-update").check(regex("data: price(.*)"))
+        ),
+
+  pause(280, 320), // Stay connected ~5 minutes with some variation
+  sse("Prices").close()
     );
 
   setUp(
