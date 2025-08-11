@@ -9,11 +9,13 @@ import {
 } from "@gatling.io/core";
 import { http, sse } from "@gatling.io/http";
 
-declare const process: { env: { [key: string]: string | undefined } };
+// Gatling's JavaScript engine exposes the Java interop API
+declare const Java: any;
 
 // Define the simulation
 export default simulation((setUp) => {
-  const baseUrl = process.env.BASE_URL || "http://localhost:3000";
+  const System = Java.type("java.lang.System");
+  const baseUrl = System.getenv("BASE_URL") || "http://localhost:3000";
 
   const httpProtocol = http.baseUrl(baseUrl);
 
