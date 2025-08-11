@@ -26,7 +26,9 @@ export default simulation((setUp) => {
   .exec(
     sse("Prices").get("/prices")
       .await(5).on(
-         sse.checkMessage("price-update").check(regex("data: price(.*)"))
+         // The check is applied on the SSE data field, so the regex should
+         // match the content directly without the "data:" prefix
+         sse.checkMessage("price-update").check(regex("price(.*)"))
       ),
   
     pause(2, 8),
@@ -38,7 +40,8 @@ export default simulation((setUp) => {
   .exec(
     sse("Prices").get("/prices")
       .await(30).on(
-          sse.checkMessage("price-update").check(regex("data: price(.*)"))
+          // Match the message content itself, which contains the JSON payload
+          sse.checkMessage("price-update").check(regex("price(.*)"))
       ),
   
     pause(25, 35),
@@ -50,7 +53,8 @@ export default simulation((setUp) => {
     .exec(
     sse("Prices").get("/prices")
       .await(300).on(
-          sse.checkMessage("price-update").check(regex("data: price(.*)"))
+          // Remove the "data:" prefix from the regex to match the parsed data
+          sse.checkMessage("price-update").check(regex("price(.*)"))
         ),
 
   pause(280, 320), // Stay connected ~5 minutes with some variation
