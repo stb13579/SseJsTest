@@ -10,8 +10,20 @@ This repository demonstrates a complete workflow for load testing a Server-Sent 
 
 ## 📁 Project Structure
 
+```
+.
+├── frontend/        # Browser client for viewing SSE streams
+├── gatling/         # Load-testing scripts and config
+│   ├── javascript/
+│   │   ├── src/        # JS simulations
+│   │   └── resources/  # JS assets (conf, feeders)
+│   └── typescript/
+│       ├── src/        # TS simulations
+│       └── resources/  # TS assets (conf, feeders)
+└── sse-demo-app/   # Node.js SSE demo server
+```
 
-**Purpose:**  
+**Purpose:**
 Showcase how to build, run, and load test a modern SSE service using Gatling JS, with a focus on reproducibility, remote testing, and best practices for test-as-code.
 
 ## 🚀 Running the Full Demo with Docker & Gatling Enterprise
