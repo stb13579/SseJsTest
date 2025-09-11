@@ -16,4 +16,3 @@ Optionally, provide your ngrok auth token when starting the stack:
 ```bash
 NGROK_AUTHTOKEN=<your-token> docker-compose up --build
 ```
-
