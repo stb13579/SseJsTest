@@ -10,28 +10,6 @@ This repository demonstrates a complete workflow for load testing a Server-Sent 
 
 ## 📁 Project Structure
 
-```text
-.
-├── Frontend/                                    # Optional frontend code to interact with SSE app
-    |── app.js                                   # Simple web client for SSE
-    |── index.html                               # Basic HTML page
-    └── ...
-|── gatling/                                     # Gatling JS load test project
-    ├── javascript/
-│       ├── src/  
-│           |   ├── ssePriceFeed.gatling.js      # Gatling JS simulation(s)
-│           |   └── ...                     # Additional simulations
-│   ├── sse-app/                # SSE demo application code
-│   ├── example.gatling.js      # Gatling JS simulation(s)
-│   └── ...                     # Additional simulations
-├── resources/
-│   ├── data/                   # CSV feeders, etc.
-│   ├── postman/                # Postman collections
-│   └── ...                     # Other test assets
-├── docker-compose.yml          # Docker setup for SSE app & ngrok
-├── README.md                   # Project documentation
-└── package.json                # Node.js dependencies
-```
 
 **Purpose:**  
 Showcase how to build, run, and load test a modern SSE service using Gatling JS, with a focus on reproducibility, remote testing, and best practices for test-as-code.
